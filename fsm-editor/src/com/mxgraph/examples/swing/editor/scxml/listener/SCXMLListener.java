@@ -9,8 +9,10 @@ import java.awt.event.WindowListener;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.io.StringReader;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -70,20 +72,21 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 	private JButton saveButton,loadButton,reloadButton;
 	private JButton startStopButton;
 	private JTextField port;
+	private JTextField server;
 
-	ServerSocket socket = null;
+	// Socket socket = null;
 	private Socket clientSocket;
 	private SCXMLSocketListener listener;
 	private SCXMLGraphComponent graphComponent;
 	private mxIGraphModel model;
 	private SCXMLGraphEditor editor;
-	
+
 	private CellSelector cellHighlighter;
 
 	public SCXMLListener(JFrame parent, SCXMLGraphEditor editor) {
 		super(parent,"SCXML Listener");
 		highlightedCellsEachInstant=new ArrayList<HashSet<mxCell>>();
-		
+
 		graphComponent=editor.getGraphComponent();
 		model=graphComponent.getGraph().getModel();
 		this.editor=editor;
@@ -94,7 +97,7 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 		JPanel contentPane = new JPanel(new BorderLayout());
 		populateGUI(contentPane);
 		contentPane.setOpaque(true); //content panes must be opaque
-		
+
 		//Create and set up the window.
 		setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 		setContentPane(contentPane);
@@ -103,19 +106,27 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 		pack();
 		setVisible(false);
 	}
-	
+
 	private void populateGUI(JPanel contentPane) {
 
 		JLabel portLabel = new JLabel("port:");
-		
+		JLabel serverLabel = new JLabel("server:");
+
 		port = new JTextField(10);
+		port.setText("3003");
 		port.addActionListener(this);
 		port.getDocument().addDocumentListener(this);
-		
+
+		server = new JTextField(20);
+		server.setText("localhost");
+		server.addActionListener(this);
+		server.getDocument().addDocumentListener(this);
+
+
 		startStopButton=new JButton(mxResources.get("startSCXMLListener"));
 		startStopButton.setActionCommand("start");
 		startStopButton.addActionListener(this);
-				
+
 		reloadButton = new JButton(mxResources.get("reloadSCXMLListener"));
 		reloadButton.setActionCommand("refresh");
 		reloadButton.setEnabled(false);
@@ -123,11 +134,14 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 		JPanel reloadButtonPane = new JPanel();
 		reloadButtonPane.setLayout(new BoxLayout(reloadButtonPane,BoxLayout.LINE_AXIS));
 		reloadButtonPane.add(reloadButton);
-		
+
 		JPanel startStopButtonPane = new JPanel();
 		startStopButtonPane.setLayout(new BoxLayout(startStopButtonPane,BoxLayout.LINE_AXIS));
+		startStopButtonPane.add(serverLabel);
+		startStopButtonPane.add(server);
 		startStopButtonPane.add(portLabel);
 		startStopButtonPane.add(port);
+
 		startStopButtonPane.add(Box.createHorizontalStrut(5));
 		startStopButtonPane.add(startStopButton);
 		startStopButtonPane.setBorder(BorderFactory.createEmptyBorder(5,5,5,5));
@@ -163,7 +177,7 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 		contentPane.add(listScrollPane);
 		contentPane.add(loadSaveButtonPane);
 
-		setStatus(PRESTARTING);
+		//setStatus(PRESTARTING);
 	}
 
 	class SCXMLEventRenderer extends JLabel implements ListCellRenderer {
@@ -241,13 +255,13 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 	@Override
 	public void windowActivated(WindowEvent e) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
 	public void windowClosed(WindowEvent e) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
@@ -260,25 +274,25 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 	@Override
 	public void windowDeactivated(WindowEvent e) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
 	public void windowDeiconified(WindowEvent e) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
 	public void windowIconified(WindowEvent e) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
 	public void windowOpened(WindowEvent e) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	String lastDir=null;
@@ -286,24 +300,27 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 	public void actionPerformed(ActionEvent e) {
 		String cmd=e.getActionCommand();
 		Integer portValue;
-		if (cmd.equals("start") && ((portValue=validPort(port.getText()))!=null)) {
-			if (initiateListener(portValue)) {
-				setStatus(WAITING);
+		String serverValue;
+		if (cmd.equals("start") && ((portValue=validPort(port.getText()))!=null) && ((serverValue=validServer(server.getText()))!=null)) {
+			// if (initiateConnection(serverValue, portValue)) {
+			//		setStatus(WAITING);
+			clientSocket = initiateConnection(serverValue, portValue);
+			if (clientSocket != null ) {
+				setStatus(STARTED);
 				SwingUtilities.invokeLater(new Runnable() {
 					@Override
 					public void run() {
-						if ((clientSocket=waitForConnection(socket))!=null) {
-							setStatus(STARTED);
-							listener=new SCXMLSocketListener(SCXMLListener.this,clientSocket);
-							listener.start();
-						} else {
-							setStatus(STOPPED);
-						}
+						//if ((clientSocket=waitForConnection(socket))!=null) {
+						listener=new SCXMLSocketListener(SCXMLListener.this,clientSocket);
+						listener.start();
 					}
 				});
 			} else {
 				setStatus(STOPPED);
 			}
+			//} else {
+			//	setStatus(STOPPED);
+			//}
 		} else if (cmd.equals("stop")) {
 			setStatus(STOPPED);
 		} else if (cmd.equals("save")) {
@@ -371,6 +388,12 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 		return port;
 	}
 
+	private String validServer(String text) {
+
+		return text;
+	}
+
+
 	@Override
 	public void changedUpdate(DocumentEvent e) {
 		handleIDField(e);
@@ -385,7 +408,7 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 	public void removeUpdate(DocumentEvent e) {
 		handleIDField(e);
 	}
-	
+
 	private void handleIDField(DocumentEvent e) {
 		if (isEmptyIDField(e))
 			startStopButton.setEnabled(false);
@@ -393,26 +416,42 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 			startStopButton.setEnabled(true);
 	}
 	private boolean isEmptyIDField(DocumentEvent e) {
-        if (e.getDocument().getLength() <= 0) {
-            return true;
-        }
-        return false;
-    }
-	
-	private boolean initiateListener(int port) {
+		if (e.getDocument().getLength() <= 0) {
+			return true;
+		}
+		return false;
+	}
+
+	public Socket initiateConnection(String server, int port) {
+		Socket socket=null;
 		if (socket==null) {
 			try {
-				socket = new ServerSocket(port);
-				return true;
+				socket = new Socket(server, port);
+				socket.setSoTimeout(5000);
+				return socket;
 			} catch (IOException e) {
 				JOptionPane.showMessageDialog(this, "impossible to listen to port '"+port+"': "+e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
 			} catch (IllegalArgumentException e) {
 				JOptionPane.showMessageDialog(this, "illegal port: '"+port+"'", "Error", JOptionPane.ERROR_MESSAGE);
 			}
 		}
-		return false;
+		return socket;
 	}
-	
+
+	//	private boolean initiateListener(int port) {
+	//		if (socket==null) {
+	//			try {
+	//				socket = new ServerSocket(port);
+	//				return true;
+	//			} catch (IOException e) {
+	//				JOptionPane.showMessageDialog(this, "impossible to listen to port '"+port+"': "+e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+	//			} catch (IllegalArgumentException e) {
+	//				JOptionPane.showMessageDialog(this, "illegal port: '"+port+"'", "Error", JOptionPane.ERROR_MESSAGE);
+	//			}
+	//		}
+	//		return false;
+	//	}
+
 	public void setStatus(int newStatus) {
 		switch (newStatus) {
 		case PRESTARTING:
@@ -420,7 +459,7 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 			startStopButton.setActionCommand("start");
 			startStopButton.setText(mxResources.get("startSCXMLListener"));
 			startStopButton.setEnabled(false);
-			port.setText("");
+			//port.setText("");
 			port.setEnabled(true);			
 			list.setEnabled(false);
 			saveButton.setEnabled(false);
@@ -467,7 +506,7 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 			break;
 		}
 	}
-	
+
 	private void resetEventList() {
 		resetAllSCXMLEventExecutions(list.getSelectedIndex());
 		listModel.clear();
@@ -497,14 +536,14 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 	public void stopListener() {
 		try {
 			if (listener!=null) listener.halt();
-			if (socket!=null) socket.close();
+			if (clientSocket!=null) clientSocket.close();
 		} catch (IOException e) {
 			JOptionPane.showMessageDialog(this, "Error while terminating SCXML listener.", "Error", JOptionPane.ERROR_MESSAGE);
 		}
-		socket=null;
+		clientSocket=null;
 		listener=null;
 	}
-	
+
 	private Socket waitForConnection(ServerSocket socket) {
 		if (socket!=null) {
 			try {
@@ -518,12 +557,15 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 		}
 		return null;
 	}
+
+
+
 	class SCXMLSocketListener extends Thread {
-		private SCXMLListener gui;
-		private Socket socket;
+		protected SCXMLListener gui;
+		protected  Socket socket;
 		private BufferedReader in;
 		private OutputStream out;
-		private static final byte ACK = 1;
+		protected static final byte ACK = 1;
 
 		public SCXMLSocketListener(SCXMLListener l,Socket clientSocket) {
 			this.gui=l;
@@ -531,26 +573,57 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 		}
 
 		public void run() {
-	        try {
+			try {
 				in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 				out=socket.getOutputStream();
-        		out.write(ACK);
-		        String inputLine;
-		        while (gui.getStatus()==STARTED) {
-		        	if (in.ready()) {
-		        		inputLine = in.readLine();
-		        		out.write(ACK);
-		        		if (inputLine!=null) gui.addEvent(inputLine);
-		        	}
-		        }
+				out.write(ACK);
+				String inputLine;
+				while (gui.getStatus()==STARTED) {
+					if (in.ready()) {
+						inputLine = in.readLine();
+						out.write(ACK);
+						if (inputLine!=null) gui.addEvent(inputLine);
+					}
+				}
 			} catch (IOException e) {
 				gui.setStatus(STOPPED);
 			}
-        }
-		
+		}
+
 		public void halt() throws IOException {
-	        if (in!=null) in.close();
-	        if (socket!=null) socket.close();
+			if (in!=null) in.close();
+			if (socket!=null) socket.close();
+		}
+	}
+
+	class SCXMLSocketClient extends SCXMLSocketListener {
+		private PrintWriter out;
+		private BufferedReader in;
+
+		public SCXMLSocketClient(SCXMLListener l, Socket clientSocket) {
+			super(l, clientSocket);
+			// TODO Auto-generated constructor stub
+		}
+
+		public void run() {
+			try {
+				out = new PrintWriter(socket.getOutputStream(), true);
+				in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+				// in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+				// out=socket.getOutputStream();
+				out.write(ACK);
+				String inputLine;
+				while (gui.getStatus()==STARTED) {
+					if (in.ready()) {
+						inputLine = in.readLine();
+						out.write(ACK);
+						if (inputLine!=null) gui.addEvent(inputLine);
+					}
+				}
+			} catch (IOException e) {
+				gui.setStatus(STOPPED);
+			}
 		}
 	}
 
@@ -586,7 +659,7 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 			//JOptionPane.showMessageDialog(this, "Unknown command received", "Warning", JOptionPane.WARNING_MESSAGE);
 		}
 	}
-	
+
 	public void resetAllSCXMLEventExecutions(int i) {
 		if (i>=0) {
 			HashSet<mxCell> highlightedCells = getHighlightAtIndex(i);
@@ -655,7 +728,7 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 			if ((arg1==null) && (arg1n!=null)) arg1=graphComponent.getSCXMLNodeForID(arg1n);
 			if ((arg2==null) && (arg2n!=null)) arg2=graphComponent.getSCXMLNodeForID(arg2n);
 		}
-		
+
 		public void execute(mxIGraphModel model,boolean show,HashSet<mxCell> highlightedCells) {
 			Object[] edges;
 			switch (command) {
@@ -679,7 +752,7 @@ public class SCXMLListener extends JDialog implements ListSelectionListener, Win
 				break;
 			}
 		}
-		
+
 		public String write() {
 			switch (command) {
 			case SHOWNODE:
